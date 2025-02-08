@@ -1,20 +1,31 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, Alert, TouchableOpacity, ActivityIndicator, Linking, ScrollView,Platform } from 'react-native';
+import {
+  Platform,
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  Alert,
+  TouchableOpacity,
+  ActivityIndicator,
+  Linking,
+  ScrollView,
+} from 'react-native';
 import { getCustomers, createCustomer, updateCustomer, deleteCustomer, login } from './src/api/api';
 import { Ionicons } from 'react-native-vector-icons';
 import { Button, Card, Title, Paragraph, TextInput as PaperInput } from 'react-native-paper';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import RNPickerSelect from 'react-native-picker-select';
+import Toast from 'react-native-toast-message';
 
-// SplashScreen Component
 const SplashScreen = ({ navigation }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     setTimeout(() => {
       setIsLoading(false);
-      navigation.replace('Login'); // Transition to Login after 2 seconds
+      navigation.replace('Login');
     }, 2000);
   }, []);
 
@@ -22,146 +33,143 @@ const SplashScreen = ({ navigation }) => {
     <View style={styles.splashContainer}>
       <Ionicons name="beer" size={100} color="#fff" />
       <Text style={styles.splashTitle}>Welcome to KaThuli's Tavern</Text>
-      {isLoading && <Text style={styles.loading}>Pouring your experience.....</Text>}
-     </View>
+      {isLoading && <Text style={styles.loading}>Pouring your experience...</Text>}
+    </View>
   );
 };
 
-// Login Screen Component
+const CustomerPage = ({ route }) => {
+  const { name } = route.params; // Access 'name' from route params
+  const [customerData, setCustomerData] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Fetch customer's details using the name
+    const fetchCustomerDetails = async () => {
+      try {
+        const response = await getCustomers();
+        console.log('Route params:', route.params); // Debug route params
+        console.log('Customers response:', response.customers); // Debug customers
+
+        // Find customer by name
+        const customer = response.customers.find(cust => cust.name === name);
+        console.log('Filtered customer:', customer); // Debug filtered customer
+
+        if (customer) {
+          setCustomerData(customer); // Store full customer data
+        } else {
+          Alert.alert('Error', 'Customer not found');
+        }
+      } catch (error) {
+        Alert.alert('Error', 'Failed to fetch customer details.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchCustomerDetails();
+  }, [name]);
+
+  return (
+    <ScrollView contentContainerStyle={styles.container}>
+      <Text style={styles.title}>Customer Dashboard</Text>
+      {isLoading ? (
+        <ActivityIndicator size="large" color="#1e3a8a" />
+      ) : (
+        customerData && (
+          <>
+            <Text style={{ fontSize: 18, color: '#555', marginBottom: 10 }}>
+              Name: {customerData.name}
+            </Text>
+            <Text style={{ fontSize: 18, color: '#555', marginBottom: 10 }}>
+              Phone: {customerData.phone_number}
+            </Text>
+            <Text style={{ fontSize: 18, color: '#4CAF50', marginBottom: 10 }}>
+              Balance: {customerData.balance}
+            </Text>
+            <Text style={{ fontSize: 18, color: '#888', marginBottom: 20 }}>
+              Password: {customerData.password}
+            </Text>
+          </>
+        )
+      )}
+    </ScrollView>
+  );
+};
+
 const LoginScreen = ({ navigation }) => {
   const [name, setname] = useState('');
   const [role, setRole] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  console.log("Role: ",role);
+
   const handleLogin = async () => {
     setIsLoading(true);
     try {
-      const response = await login({ name, password, role }); // Assume this API function validates the credentials
-    
+      const response = await login({ name, password, role });
       if (response.status === 200) {
-        // If login is successful, pass the role from the response
-        if (response.role === "admin") {
+        Toast.show({ type: 'success', text1: 'Login Successful' });
+        if (response.role === 'admin') {
           navigation.replace('MainApp', { role: response.role, name });
-        } else if (response.role === "customer") {
-          navigation.replace('CustomerPage', { role: response.role, name });
+        } else if (response.role === 'customer') {
+          navigation.replace('CustomerPage', { role: response.role, name:response.name});
         }
       } else {
-        Alert.alert('Invalid credentials', 'Please check your name and password.');
+        // Alert.alert('Invalid credentials', 'Please check your name and password.');
+        Toast.show({ type: 'error', text1: 'Invalid credentials' });
       }
     } catch (error) {
-      console.error(error);
-      Alert.alert('Login failed', 'Something went wrong. Please try again.');
+       Toast.show({ type: 'error', text1: 'Login failed', text2: error.message });
+    
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Login</Text>
       <PaperInput
-  label="Name"
-  value={name}
-  onChangeText={setname}
-  style={styles.input}
-  left={<PaperInput.Icon name="account" color="#2c3e50" />}
-  placeholder="Enter your name"
-  theme={{ colors: { primary: '#2c3e50', underlineColor: 'transparent' } }}
-/>
-
-<PaperInput
-  label="Password"
-  value={password}
-  onChangeText={setPassword}
-  style={styles.input}
-  secureTextEntry
-  left={<PaperInput.Icon name="lock" color="#2c3e50" />}
-  placeholder="Enter your password"
-  theme={{ colors: { primary: '#2c3e50', underlineColor: 'transparent' } }}
-/>
-
-<Text style={styles.selectLabel}>Role</Text>
+        label="Name"
+        value={name}
+        onChangeText={setname}
+        style={styles.input}
+        left={<PaperInput.Icon name="account" />}
+        placeholder="Enter your name"
+      />
+      <PaperInput
+        label="Password"
+        value={password}
+        onChangeText={setPassword}
+        style={styles.input}
+        secureTextEntry
+        left={<PaperInput.Icon name="lock" />}
+        placeholder="Enter your password"
+      />
+      <Text style={styles.selectLabel}>Role</Text>
       <RNPickerSelect
         onValueChange={(value) => setRole(value)}
         items={[
           { label: 'Admin', value: 'admin' },
           { label: 'Customer', value: 'customer' },
         ]}
-        style={pickerSelectStyles} // Apply styles here
+        style={pickerSelectStyles}
         value={role}
       />
       <Button mode="contained" style={styles.button} onPress={handleLogin} loading={isLoading}>
         Login
       </Button>
-    </View>
+    </ScrollView>
   );
 };
 
-// Customer Page Component
-const CustomerPage = ({ route }) => {
-  const { name } = route.params; // Get the name from the navigation params
-  const [customer, setCustomer] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    // Fetch customer data by name
-    const fetchCustomerData = async () => {
-      try {
-        const customerData = await getCustomers(); // Assume the API returns all customers
-        const foundCustomer = customerData.customers.find(c => c.name === name);
-        setCustomer(foundCustomer);
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchCustomerData();
-  }, [name]);
-  const handleLogout = () => {
-    // Clear user session (e.g., remove tokens, reset global state)
-    // This depends on your authentication method (AsyncStorage, Redux, etc.)
-    // Example for clearing AsyncStorage:
-    // AsyncStorage.removeItem('userToken');
-    
-    // Navigate to the login page
-    navigation.navigate('Login'); // Replace 'Login' with the appropriate route name
-  };
-
-  if (loading) {
-    return <ActivityIndicator size="large" color="#0000ff" />;
-  }
-
-  if (!customer) {
-    return <Text>No customer found.</Text>;
-  }
-
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Welcome, {customer.name}!</Text>
-      <Card style={styles.card}>
-        <Card.Content>
-          <Title style={styles.customerName}>{customer.name}</Title>
-          <Paragraph style={styles.balance}>Balance: {customer.balance}</Paragraph>
-          <Paragraph style={styles.phoneNumber}>Phone: {customer.phone_number}</Paragraph>
-          <Paragraph style={styles.password}>Password: {customer.password}</Paragraph>
-        </Card.Content>
-      </Card>
-           
-      {/* Logout button with styled text */}
-      <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-        <Text style={styles.logoutText}>Logout</Text>
-      </TouchableOpacity>
-    </View>
-  );
-};
-
-// Main App Component
-const App = ({ route }) => { // userRole is either 'admin' or 'customer'
+const App = ({ route }) => {
   const [customers, setCustomers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setButtonLoader] = useState(false);
+  const [loading, setIsLoading] = useState(true);
+  const [isFetching, setIsFetching] = useState(false); // For fetching customers
+  const [isAdding, setIsAdding] = useState(false); // For adding a customer
+  const [isUpdating, setIsUpdating] = useState(false); 
   const [newName, setNewName] = useState('');
   const [newBalance, setNewBalance] = useState('');
   const [newPhoneNumber, setNewPhoneNumber] = useState('');
@@ -170,61 +178,91 @@ const App = ({ route }) => { // userRole is either 'admin' or 'customer'
   const [editingName, setEditingName] = useState('');
   const [editingBalance, setEditingBalance] = useState('');
   const [editingPhoneNumber, setEditingPhoneNumber] = useState('');
-  const [editingPassword, setEditingPassword] = useState('');
   const userRole = route.params.role;
-
+  const [saving , setIsSaving] = useState(false);
 
   useEffect(() => {
     fetchCustomers();
   }, []);
 
   const fetchCustomers = async () => {
+    setIsFetching(true);
     try {
       const data = await getCustomers();
-      console.log("CUSTOMERS", data);
       setCustomers(data.customers);
-      setLoading(false);
+      Toast.show({ type: 'success', text1: 'Customers Loaded' });
     } catch (error) {
-      console.error(error);
-      setLoading(false);
-    }
-  };
-  const handleLogout = () => {
-    // Clear user session (e.g., remove tokens, reset global state)
-    // This depends on your authentication method (AsyncStorage, Redux, etc.)
-    // Example for clearing AsyncStorage:
-    // AsyncStorage.removeItem('userToken');
-    
-    // Navigate to the login page
-    navigation.navigate('Login'); // Replace 'Login' with the appropriate route name
-  };
-  const handleCreate = async () => {
-    if (!newName || !newBalance || !newPhoneNumber) {
-      Alert.alert('Error', 'Please provide all fields: name, balance, phone number, and password.');
-      return;
-    }
-    try {
-      await createCustomer({
-        name: newName,
-        balance: parseFloat(newBalance),
-        phone_number: newPhoneNumber,
-      });
-      setNewName('');
-      setNewBalance('');
-      setNewPhoneNumber('');
-      fetchCustomers(); // Refresh the customer list
-    } catch (error) {
-      console.error(error);
+      Toast.show({ type: 'error', text1: 'Failed to load customers' });
+    } finally {
+      setIsFetching(false);
     }
   };
 
-  const handleUpdate = async () => {
-    if (!editingName || !editingBalance || !editingPhoneNumber) {
-      Alert.alert('Error', 'Please provide all fields: name, balance, phone number, and password.');
+  const handleWhatsApp = (phoneNumber,balance) => {
+    
+    const message = encodeURIComponent(`Hello! Please clear your payment of R${balance}  at KaThuli's Tavern. Thank you!`);
+    const url = Platform.OS === 'ios'
+      ? `whatsapp://send?phone=${phoneNumber}&text=${message}`
+      : `https://wa.me/+27${phoneNumber}?text=${message}`;
+
+    Linking.openURL(url).catch(() => Alert.alert('Error', 'WhatsApp is not installed.'));
+  };
+  const handleCreateCustomer = async () => {
+    if (!newName || !newBalance || !newPhoneNumber) {
+      Toast.show({ type: 'error', text1: 'All fields are required' });
       return;
     }
     try {
-      console.log({"name":editingName,"newBalance":editingBalance,"phone":editingPhoneNumber});
+      setIsAdding(true);
+      await createCustomer({ name: newName, balance: parseFloat(newBalance), phone_number: newPhoneNumber });
+      setNewName('');
+      setNewBalance('');
+      setNewPhoneNumber('');
+      fetchCustomers();
+      Toast.show({ type: 'success', text1: 'Customer Created' });
+    } catch (error) {
+      Toast.show({ type: 'error', text1: 'Failed to create customer' });
+    }finally{
+      setIsAdding(false);
+    }
+  };
+
+  const handleDelete = async (customerId) => {
+    try {
+      // setButtonLoader(true);
+      await deleteCustomer(customerId);
+      fetchCustomers();
+      Toast.show({ type: 'success', text1: 'Customer Deleted' });
+    } catch (error) {
+      Toast.show({ type: 'error', text1: 'Failed to delete customer' });
+    }finally{
+      // setButtonLoader(false);
+    }
+  };
+
+  const handleEdit = (customer) => {
+    setEditingCustomerId(customer._id);
+    setEditingName(customer.name);
+    setEditingBalance(customer.balance.toString());
+    setEditingPhoneNumber(customer.phone_number);
+  };
+  const handleSaveEdit = async () => {
+    if (!editingName || !editingBalance || !editingPhoneNumber) {
+      Alert.alert('Error', 'All fields must be filled.');
+      return;
+    }
+  
+    console.log('Saving changes for customer:', {
+      editingCustomerId,
+      editingName,
+      editingBalance,
+      editingPhoneNumber,
+    });
+  
+    setIsSaving(true);  // Start loading when saving
+  
+    try {
+      setIsUpdating(true); 
       await updateCustomer(editingCustomerId, {
         name: editingName,
         balance: parseFloat(editingBalance),
@@ -234,98 +272,46 @@ const App = ({ route }) => { // userRole is either 'admin' or 'customer'
       setEditingName('');
       setEditingBalance('');
       setEditingPhoneNumber('');
-      fetchCustomers(); // Refresh the customer list
+      fetchCustomers();
+      Toast.show({ type: 'success', text1: 'Customer Updated Successfully' });
     } catch (error) {
-      console.error(error);
+      Toast.show({ type: 'error', text1: 'Failed to update customer' });
+    } finally {
+      setIsSaving(false); 
+      setIsUpdating(false); // Stop loading once done
     }
   };
-
-  // Hardcoded reminder message
-  const reminderMessage = "Hello, this is a friendly reminder to clear your payment at KaThuli's Tavern. Thank you!";
-
-  const handleSMS = (phoneNumber) => {
-    const url = `sms:${phoneNumber}?body=${encodeURIComponent(reminderMessage)}`;
-    Linking.openURL(url).catch((err) => console.error('Error opening SMS:', err));
-  };
-
-  const handleWhatsApp = (phoneNumber) => {
-    const message = encodeURIComponent(reminderMessage);
   
-    if (Platform.OS === 'android' || Platform.OS === 'ios') {
-      // For mobile devices (Android/iOS), use the whatsapp:// URL scheme
-      const url = `whatsapp://send?phone=${phoneNumber}&text=${message}`;
-      Linking.openURL(url).catch((err) => console.error('Error opening WhatsApp:', err));
-    } else {
-      // For desktop (PC), use the https://wa.me/ URL to open WhatsApp Web
-      const url = `https://wa.me/${phoneNumber}?text=${message}`;
-      Linking.openURL(url).catch((err) => console.error('Error opening WhatsApp:', err));
-    }
-  };
 
-  const handleDelete = async (customerId) => {
-    try {
-      await deleteCustomer(customerId);
-      fetchCustomers(); // Refresh the customer list
-    } catch (error) {
-      console.error(error);
-    }
-  };
-  // const handleLogout = (navigation) => {
-  //   Alert.alert(
-  //     "Logout",
-  //     "Are you sure you want to logout?",
-  //     [
-  //       { text: "Cancel", style: "cancel" },
-  //       {
-  //         text: "Logout",
-  //         style: "destructive",
-  //         onPress: () => navigation.replace("Login"),
-  //       },
-  //     ]
-  //   );
-  // };
-  
   const renderCustomer = ({ item }) => (
     <Card style={styles.card}>
       <Card.Content>
         <Title style={styles.customerName}>{item.name}</Title>
+        <Paragraph >ID:{item._id}</Paragraph>
         <Paragraph style={styles.balance}>Balance: {item.balance}</Paragraph>
         <Paragraph style={styles.phoneNumber}>Phone: {item.phone_number}</Paragraph>
-        <Paragraph style={styles.password}>Password: {item.password}</Paragraph>
+        <Paragraph style={styles.password}>Password:{item.password}</Paragraph>
         <View style={styles.cardActions}>
-        <TouchableOpacity
-            onPress={() => {
-              setEditingCustomerId(item.id);
-              setEditingName(item.name);
-              setEditingBalance(item.balance.toString());
-              setEditingPhoneNumber(item.phone_number);
-              setEditingPassword(item.password);
-            }}
-          >
+          <TouchableOpacity onPress={() => handleEdit(item)}>
             <Ionicons name="pencil" size={24} color="#007BFF" />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleSMS(item.phone_number)}>
-            <Ionicons name="mail" size={24} color="green" />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleWhatsApp(item.phone_number)}>
+          <TouchableOpacity onPress={() => handleWhatsApp(item.phone_number,item.balance)}>
             <Ionicons name="logo-whatsapp" size={24} color="green" />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleDelete(item.id)}>
+          <TouchableOpacity onPress={() => handleDelete(item._id)}>
             <Ionicons name="trash" size={24} color="red" />
           </TouchableOpacity>
         </View>
       </Card.Content>
     </Card>
-
   );
 
   return (
-    <ScrollView contentContainerStyle={styles.container} style={styles.scrollContainer}>
-      <Text style={styles.title}>KaThuli's Tavern - Admin Panel</Text>
-      {console.log("Current Role: ",userRole)}
+    <ScrollView contentContainerStyle={styles.container}>
+      <Text style={styles.title}>Admin Panel</Text>
       {userRole === 'admin' && (
-        <View>
-          <Text style={styles.title}>Create a New Customer</Text>
+        <View style={styles.createSection}>
+          <Text style={styles.sectionTitle}>Create a New Customer</Text>
           <PaperInput
             label="Name"
             value={newName}
@@ -345,15 +331,16 @@ const App = ({ route }) => { // userRole is either 'admin' or 'customer'
             onChangeText={setNewPhoneNumber}
             style={styles.input}
           />
-          <Button mode="contained" onPress={handleCreate}>
-            Add Customer
-          </Button>
+         <Button mode="contained" onPress={handleCreateCustomer} loading={isAdding}> 
+  Add Customer
+</Button>
+
+           
         </View>
       )}
-
-{editingCustomerId && (
+      {editingCustomerId && (
         <View style={styles.editForm}>
-          <Text style={styles.title}>Edit Customer</Text>
+          <Text style={styles.sectionTitle}>Edit Customer</Text>
           <PaperInput
             label="Name"
             value={editingName}
@@ -373,46 +360,41 @@ const App = ({ route }) => { // userRole is either 'admin' or 'customer'
             onChangeText={setEditingPhoneNumber}
             style={styles.input}
           />
-          <Button mode="contained" onPress={handleUpdate}>
+          <Button mode="contained" onPress={handleSaveEdit} loading={isUpdating}>
             Save Changes
           </Button>
         </View>
       )}
       <FlatList
         data={customers}
-        keyExtractor={(item) => item.id.toString()}
+        keyExtractor={(item, index) => (item.id ? item.id.toString() : index.toString())}
         renderItem={renderCustomer}
         refreshing={loading}
         onRefresh={fetchCustomers}
+        contentContainerStyle={{ paddingBottom: 20 }}
       />
-         {/* Logout button with styled text */}
-         <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-        <Text style={styles.logoutText}>Logout</Text>
-      </TouchableOpacity>
     </ScrollView>
   );
 };
 
 const Stack = createStackNavigator();
 
-const MainApp = () => {
-  return (
-    <NavigationContainer>
-      <Stack.Navigator initialRouteName="SplashScreen">
-        <Stack.Screen name="SplashScreen" component={SplashScreen} />
-        <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="MainApp" component={App} />
-        <Stack.Screen name="CustomerPage" component={CustomerPage} />
-      </Stack.Navigator>
-    </NavigationContainer>
-  );
-};
+const MainApp = () => (
+  <NavigationContainer>
+    <Stack.Navigator initialRouteName="SplashScreen">
+      <Stack.Screen name="SplashScreen" component={SplashScreen} />
+      <Stack.Screen name="Login" component={LoginScreen} />
+      <Stack.Screen name="MainApp" component={App} />
+      <Stack.Screen name="CustomerPage" component={CustomerPage} />
+    </Stack.Navigator>
+    <Toast />
+  </NavigationContainer>
+);
 
 const pickerSelectStyles = StyleSheet.create({
   inputAndroid: {
     backgroundColor: '#fff',
-    paddingHorizontal: 10,
-    paddingVertical: 12,
+    padding: 12,
     borderRadius: 5,
     fontSize: 16,
     color: '#2c3e50',
@@ -422,8 +404,7 @@ const pickerSelectStyles = StyleSheet.create({
   },
   inputIOS: {
     backgroundColor: '#fff',
-    paddingHorizontal: 10,
-    paddingVertical: 12,
+    padding: 12,
     borderRadius: 5,
     fontSize: 16,
     color: '#2c3e50',
@@ -431,34 +412,26 @@ const pickerSelectStyles = StyleSheet.create({
     borderColor: '#2c3e50',
     marginBottom: 15,
   },
-  placeholder: {
-    color: '#bbb',
-  },
-  iconContainer: {
-    top: 10,
-    right: 12,
-  },
 });
+
 const styles = StyleSheet.create({
   splashContainer: {
     flex: 1,
-    backgroundColor: '#1e3a8a',
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#1e3a8a',
   },
   splashTitle: {
     fontSize: 24,
-    color: '#ffffff',
+    color: '#fff',
     fontWeight: 'bold',
-    marginTop: 20,
   },
   loading: {
     marginTop: 10,
-    color: '#ffffff',
+    color: '#fff',
     fontStyle: 'italic',
   },
   container: {
-    flex: 1,
     padding: 20,
     backgroundColor: '#f3f4f6',
   },
@@ -466,8 +439,8 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     color: '#1e3a8a',
-    textAlign: 'center',
     marginBottom: 20,
+    textAlign: 'center',
   },
   input: {
     marginBottom: 12,
@@ -475,9 +448,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 12,
     fontSize: 16,
-    height: 50, // Ensures a consistent and comfortable input height
+    height: 50,
   },
-
   button: {
     marginTop: 10,
     paddingVertical: 10,
@@ -486,9 +458,10 @@ const styles = StyleSheet.create({
   },
   card: {
     marginVertical: 10,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#fff',
     elevation: 3,
     borderRadius: 8,
+    padding: 10,
   },
   customerName: {
     fontSize: 20,
@@ -503,21 +476,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6b7280',
   },
-  password: {
-    fontSize: 14,
-    fontStyle: 'italic',
-    color: '#9ca3af',
-  },
   cardActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 10,
   },
   createSection: {
-    marginBottom: 20,
     padding: 10,
     borderRadius: 8,
     backgroundColor: '#e5e7eb',
+    marginBottom: 20,
   },
   sectionTitle: {
     fontSize: 18,
@@ -525,29 +493,11 @@ const styles = StyleSheet.create({
     color: '#1e3a8a',
     marginBottom: 10,
   },
-  editActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-evenly',
-    marginTop: 10,
-  },
-  actionIcon: {
-    marginHorizontal: 10,
-  },
-  logoutButton: {
-    marginTop: 20,
-    backgroundColor: '#f44336', // Red color for the logout button
-    paddingVertical: 10,
-    paddingHorizontal: 30,
-    borderRadius: 5,
-    alignItems: 'center',
-  },
-  logoutText: {
-    color: '#fff', // White text color
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  scrollContainer: {
-    flex: 1,  // Ensure the scroll view takes full height
+  editForm: {
+    padding: 10,
+    borderRadius: 8,
+    backgroundColor: '#f0f4ff',
+    marginBottom: 20,
   },
 });
 
